@@ -1,0 +1,47 @@
+{
+    "name": "crehler/base-linker-shops-api",
+    "description": "Crehler BaseLinker Shops API",
+    "type": "shopware-platform-plugin",
+    "license": "proprietary",
+    "version": "1.0.31",
+    "authors": [
+        {
+            "name": "Crehler Sp. z o. o.",
+            "email": "support@crehler.com",
+            "homepage": "https://crehler.com",
+            "role": "Owner"
+        },
+        {
+            "name": "Michał Bortkiewicz",
+            "homepage": "https://github.com/michubortek",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "email": "support@crehler.com"
+    },
+    "autoload": {
+        "psr-4": {
+            "Crehler\\BaseLinkerShopsApi\\": "src/"
+        }
+    },
+    "require": {
+        "shopware/core": "6.4.*",
+        "shopware/storefront": "6.4.*"
+    },
+    "extra": {
+        "shopware-plugin-class": "Crehler\\BaseLinkerShopsApi\\CrehlerBaseLinkerShopsApi",
+        "plugin-icon": "src/Resources/config/plugin.png",
+        "copyright": "(c) by Crehler Sp. z o. o.",
+        "label": {
+            "de-DE": "Crehler BaseLinker Shops API",
+            "en-GB": "Crehler BaseLinker Shops API",
+            "pl-PL": "Crehler BaseLinker Shops API"
+        },
+        "manufacturerLink": {
+            "de-DE": "https://store.shopware.com/crehler.html",
+            "en-GB": "https://store.shopware.com/en/crehler.html",
+            "pl-PL": "https://store.shopware.com/en/crehler.html"
+        }
+    }
+}

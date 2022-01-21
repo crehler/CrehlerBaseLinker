@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<container xmlns="http://symfony.com/schema/dic/services"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+        <service id="Crehler\BaseLinkerShopsApi\Services\ConfigService" >
+            <argument type="string">CrehlerBaseLinkerShopsApi</argument>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService" />
+        </service>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Readers\CategoryReader" >
+            <argument type="service" id="category.repository"/>
+            <argument type="service" id="cms_page.repository"/>
+            <argument type="service" id="sales_channel.repository"/>
+        </service>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Readers\ProductReader" >
+            <argument type="service" id="product.repository"/>
+            <argument type="service" id="category.repository"/>
+            <argument type="service" id="sales_channel.product.repository"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Readers\PropertyReader"/>
+        </service>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Readers\PropertyReader"/>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Readers\OrderReader">
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="shipping_method.repository"/>
+            <argument type="service" id="payment_method.repository"/>
+            <argument type="service" id="state_machine_state.repository"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Readers\ProductReader"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Creators\OrderCreator"/>
+            <argument type="service" id="crehler_base_linker.logger"/>
+        </service>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Creators\OrderCreator">
+            <argument type="service" id="currency.repository"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Helper\PaymentMethodHelper"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Helper\ShippingMethodHelper"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Readers\CustomerReader"/>
+            <argument type="service" id="Crehler\BaseLinkerShopsApi\Services\Readers\ProductReader"/>
+            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
+            <argument type="service" id="Shopware\Core\System\NumberRange\ValueGenerator\NumberRangeValueGeneratorInterface"/>
+            <argument type="service" id="crehler_base_linker.logger"/>
+        </service>
+
+        <service id="Crehler\BaseLinkerShopsApi\Services\Readers\CustomerReader">
+            <argument type="service" id="country.repository"/>
+            <argument type="service" id="customer.repository"/>
+            <argument type="service" id="salutation.repository"/>
+        </service>
+
+    </services>
+</container>

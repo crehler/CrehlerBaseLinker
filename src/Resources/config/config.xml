@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/platform/master/src/Core/System/SystemConfig/Schema/config.xsd">
+
+    <card>
+        <title lang="pl-PL">Konfiguracja</title>
+        <title lang="de-DE">Konfiguration</title>
+        <title>Configuration</title>
+
+        <component name="sw-entity-multi-id-select">
+            <name>codPaymentMethodIds</name>
+            <entity>payment_method</entity>
+            <label>Payment methods with payment on delivery</label>
+            <label lang="de-DE">Zahlungsmethoden bei Zahlung per Nachnahme</label>
+            <label lang="pl-PL">Sposoby płatność z płatnością przy odbiorze</label>
+        </component>
+
+        <input-field type="password">
+            <name>shopsApiPassword</name>
+            <label>Shops API password</label>
+            <label lang="pl-PL">Shops API password</label>
+            <label lang="de-DE">Shops API password</label>
+        </input-field>
+
+        <component name="cr-baselinker">
+            <name>testCredentials</name>
+            <label>Test</label>
+            <label lang="pl-PL">Test</label>
+            <label lang="de-DE">Test</label>
+            <helpText>You can test the access in the "Integrations" tab of your Baselinker account.</helpText>
+            <helpText lang="de-DE">Sie können den Zugang unter der Registerkarte “Integrationen” in Ihrem Baselinker-Konto testen.</helpText>
+            <helpText lang="pl-PL">Możesz przetestować dostęp w zakładce "Integracje" na Twoim koncie Baselinker.</helpText>
+        </component>
+
+    </card>
+</config>

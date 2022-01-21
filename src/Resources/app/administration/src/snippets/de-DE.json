@@ -1,0 +1,7 @@
+{
+    "crehler-baselinker-shops-api": {
+        "config": {
+            "credentialCheckButton": "API-Anmeldeinformationen testen"
+        }
+    }
+}
