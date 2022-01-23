@@ -3,11 +3,10 @@
 ## BaseLinker Integration Plugin for Shopware 6
 
 **1. Easy to use**\
-BaseLinker integration was created in such a way that it is not complicated to navigate and is easy to use. A great advantage of our extension is the support of all sales channels and their orders from a single panel.  Store orders in Shopware are easily transferred to the BaseLinker panel.
+BaseLinker integration was created in such a way that it is not complicated to navigate and is easy to use. A great advantage of our extension is the support of all sales channels and their orders from a single panel. Store orders in Shopware are easily transferred to the BaseLinker panel.
 
 **2. Access to many new sales channels**\
 BaseLinker allows you to integrate your store with many new sales channels such as Amazon, eBay, Shopee, Etsy etc. Increase your sales today!
-List of available marketplace integrations: https://baselinker.com/en-US/integrations/
 
 **3. By integrating Shopware with BaseLinker, you can:**
 - download orders from Shopware to the BaseLinker panel,
@@ -22,7 +21,4 @@ List of available marketplace integrations: https://baselinker.com/en-US/integra
 **4. Couriers**\
 Thanks to the integration of the online store and BaseLinker, you will be able to integrate with all the most popular couriers, including: DPD, InPost, DHL, Mall Delivery, FedEX, GLS, Hermes, UPS, TNT and many more. BaseLinker also supports integration with services that support couriers as a central place to manage shipments.
 
-Our solution guarantees the integration of all necessary information about orders and their statuses, products (descriptions, prices, availability in stock).
 List of available integrations: https://baselinker.com/en-US/integrations/
-
-Check out our extension and increase your sales today!
