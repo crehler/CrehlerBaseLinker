@@ -8,6 +8,7 @@ use Crehler\BaseLinkerShopsApi\Struct\ConfigStruct;
 use Monolog\Logger;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTax;
+use Shopware\Core\Checkout\Order\Aggregate\OrderAddress\OrderAddressEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStates;
@@ -176,15 +177,7 @@ class OrderReader
                 continue;
             }
 
-            $deliveryPoint = ['name' => '', 'address' => '', 'postCode' => '', 'city' => ''];
-            if (isset($deliveryAddress->getCustomFields()['inpostId'])) {
-                $deliveryPoint = [
-                    'name' => $deliveryAddress->getCustomFields()['inpostId'],
-                    'address' => $deliveryAddress->getStreet(),
-                    'postCode' => $deliveryAddress->getZipcode(),
-                    'city' => $deliveryAddress->getCity(),
-                ];
-            }
+            $deliveryPoint = $this->getDeliveryPoint($deliveryAddress);
 
             $ordersResponse[$order->getOrderNumber()] = [
                 'delivery_fullname' => $deliveryAddress->getFirstName() . ' ' . $deliveryAddress->getLastName(),
@@ -240,6 +233,21 @@ class OrderReader
         }
 
         return $ordersResponse;
+    }
+
+    public function getDeliveryPoint(OrderAddressEntity $deliveryAddress): array
+    {
+        $deliveryPoint = ['name' => '', 'address' => '', 'postCode' => '', 'city' => ''];
+        if (isset($deliveryAddress->getCustomFields()['inpostId'])) {
+            $deliveryPoint = [
+                'name' => $deliveryAddress->getCustomFields()['inpostId'],
+                'address' => $deliveryAddress->getStreet(),
+                'postCode' => $deliveryAddress->getZipcode(),
+                'city' => $deliveryAddress->getCity(),
+            ];
+        }
+
+        return $deliveryPoint;
     }
 
     public function orderUpdate(
