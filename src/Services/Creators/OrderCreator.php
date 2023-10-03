@@ -27,7 +27,7 @@ use Shopware\Core\Checkout\Payment\PaymentMethodEntity;
 use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Content\Product\SalesChannel\SalesChannelProductEntity;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Util\Random;
@@ -43,7 +43,7 @@ use Shopware\Core\System\Tax\TaxEntity;
 
 class OrderCreator
 {
-    private EntityRepositoryInterface $currencyRepository;
+    private EntityRepository $currencyRepository;
     private PaymentMethodHelper $paymentMethodHelper;
     private ShippingMethodHelper $shippingMethodHelper;
     private CustomerReader $customerReader;
@@ -53,7 +53,7 @@ class OrderCreator
     private LoggerInterface $logger;
 
     public function __construct(
-        EntityRepositoryInterface $currencyRepository,
+        EntityRepository $currencyRepository,
         PaymentMethodHelper $paymentMethodHelper,
         ShippingMethodHelper $shippingMethodHelper,
         CustomerReader $customerReader,
@@ -167,6 +167,12 @@ class OrderCreator
 
         if (null === $currency) throw new \Exception('Shopware store does not have ' . $orderAddRequest->getCurrency());
 
+        if ($orderAddRequest->getDateAdd() !== null) {
+            $orderDateTime = (new \DateTimeImmutable())->setTimestamp($orderAddRequest->getDateAdd());
+        } else {
+            $orderDateTime = (new \DateTimeImmutable());
+        }
+
         $order = [
             'id' => $orderId,
             'orderNumber' => $this->numberRangeValueGenerator->getValue(
@@ -175,7 +181,7 @@ class OrderCreator
                 $salesChannelContext->getSalesChannelId()
             ),
             'customerComment' => $orderAddRequest->getUserComments(),
-            'orderDateTime' => (new \DateTimeImmutable())->setTimestamp($orderAddRequest->getDateAdd()),
+            'orderDateTime' => $orderDateTime,
             'price' => $this->preparePrice($totalPriceNet, $totalPrice, $orderTaxData),
             'shippingCosts' => new CalculatedPrice(
                 $orderAddRequest->getDeliveryPrice(),
@@ -290,7 +296,7 @@ class OrderCreator
             } elseif ($orderStatusName == 'completed' && $newOrderStatusName == 'cancelled') {
                 $this->changeOrderStatus($orderId, 'reopen', $context);
                 $this->changeOrderStatus($orderId, 'cancel', $context);
-                $this->changeDeliveryStatus($orderDeliveryId, 'cancel', $context);
+                $this->changeDeliveryStatus($orderDeliveryId, 'retour', $context);
             } elseif ($orderStatusName == 'cancelled' && $newOrderStatusName == 'open') {
                 $this->changeOrderStatus($orderId, 'reopen', $context);
                 $this->changeDeliveryStatus($orderDeliveryId, 'reopen', $context);
@@ -479,6 +485,7 @@ class OrderCreator
                     'city' => $customer->getDefaultBillingAddress()->getCity(),
                     'street' => $customer->getDefaultBillingAddress()->getStreet(),
                     'countryId' => $customer->getDefaultBillingAddress()->getCountryId(),
+                    'phoneNumber' => $orderAddRequest->getPhone(),
                     'id' => $billingAddressId,
                 ]
             ],
@@ -549,6 +556,7 @@ class OrderCreator
                             'zipcode' => $orderAddRequest->getInvoicePostcode(),
                             'city' => $orderAddRequest->getInvoiceCity(),
                             'street' => $orderAddRequest->getInvoiceAddress(),
+                            'phoneNumber' => $orderAddRequest->getPhone(),
                             'countryId' => $this->customerReader->getCountryId(
                                 $orderAddRequest->getInvoiceCountryCode(),
                                 $context
@@ -570,6 +578,7 @@ class OrderCreator
                         $orderAddRequest->getInvoiceCountryCode(),
                         $context
                     ),
+                    'phoneNumber' => $orderAddRequest->getPhone(),
                     'id' => $billingAddressId,
                 ]
             ],
@@ -587,6 +596,7 @@ class OrderCreator
                         'zipcode' => $orderAddRequest->getDeliveryPostcode(),
                         'city' => $orderAddRequest->getDeliveryCity(),
                         'street' => $orderAddRequest->getDeliveryAddress(),
+                        'phoneNumber' => $orderAddRequest->getPhone(),
                         'countryId' => $this->customerReader->getCountryId(
                             $orderAddRequest->getDeliveryCountryCode(),
                             $context

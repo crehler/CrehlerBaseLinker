@@ -3,7 +3,7 @@
     "description": "Crehler BaseLinker Shops API",
     "type": "shopware-platform-plugin",
     "license": "proprietary",
-    "version": "1.0.31",
+    "version": "1.0.32",
     "authors": [
         {
             "name": "Crehler Sp. z o. o.",
@@ -26,8 +26,8 @@
         }
     },
     "require": {
-        "shopware/core": "6.4.*",
-        "shopware/storefront": "6.4.*"
+        "shopware/core": "6.5.*",
+        "shopware/storefront": "6.5.*"
     },
     "extra": {
         "shopware-plugin-class": "Crehler\\BaseLinkerShopsApi\\CrehlerBaseLinkerShopsApi",

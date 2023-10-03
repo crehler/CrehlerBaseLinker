@@ -4,20 +4,20 @@ namespace Crehler\BaseLinkerShopsApi\Services\Readers;
 
 use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 
 class CustomerReader
 {
-    private EntityRepositoryInterface $countryRepository;
-    private EntityRepositoryInterface $customerRepository;
-    private EntityRepositoryInterface $salutationRepository;
+    private EntityRepository $countryRepository;
+    private EntityRepository $customerRepository;
+    private EntityRepository $salutationRepository;
 
     public function __construct(
-        EntityRepositoryInterface $countryRepository,
-        EntityRepositoryInterface $customerRepository,
-        EntityRepositoryInterface $salutationRepository
+        EntityRepository $countryRepository,
+        EntityRepository $customerRepository,
+        EntityRepository $salutationRepository
     ) {
         $this->countryRepository = $countryRepository;
         $this->customerRepository = $customerRepository;

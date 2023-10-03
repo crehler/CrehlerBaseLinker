@@ -14,13 +14,13 @@ class OrderAddRequest
      *
      * @var int|null
      */
-    protected ?int $date_add;
+    protected ?int $date_add = null;
 
     /**
      * service name
      * @var string|null
      */
-    protected ?string $service;
+    protected ?string $service = null;
 
     /**
      * ID zamówienia (jeśli pierwszy raz dodawane do sklepu, wartość jest pusta. Peśli było już wcześniej dodane, wartość zawiera poprzedni numer zamówienia)
@@ -31,54 +31,54 @@ class OrderAddRequest
      * Numer zamówienia z numeracji BaseLinkera
      * @var int|null
      */
-    protected ?int $baselinker_id;
+    protected ?int $baselinker_id = null;
     /**
      * Adres dostawy - imię i nazwisko
      * @var string|null
      */
-    protected ?string $delivery_fullname;
+    protected ?string $delivery_fullname = null;
 
     /**
      * Adres dostawy - firma
      * @var string|null
      */
-    protected ?string $delivery_company;
+    protected ?string $delivery_company = null;
     /**
      *    Adres dostawy - ulica i numer domu
      * @var string|null
      */
-    protected ?string $delivery_address;
+    protected ?string $delivery_address = null;
 
     /**
      *    Adres dostawy - kod pocztowy
      * @var string|null
      */
-    protected ?string $delivery_postcode;
+    protected ?string $delivery_postcode = null;
     /**
      * Adres dostawy - miasto
      * @var string|null
      */
-    protected ?string $delivery_city;
+    protected ?string $delivery_city = null;
     /**
      * Opcjonalny kod stanu, regionu, prowincji
      * @var string|null
      */
-    protected ?string $delivery_state_code;
+    protected ?string $delivery_state_code = null;
     /**
      * Adres dostawy - kraj
      * @var string|null
      */
-    protected ?string $delivery_country;
+    protected ?string $delivery_country = null;
     /**
      * Adres dostawy - 2-literowy kod kraju
      * @var string|null
      */
-    protected ?string $delivery_country_code;
+    protected ?string $delivery_country_code = null;
     /**
      * Dane płatnika - imię i nazwisko
      * @var string|null
      */
-    protected ?string $invoice_fullname;
+    protected ?string $invoice_fullname = null;
     /**
      * Dane płatnika - firma
      * @var string|null
@@ -88,102 +88,102 @@ class OrderAddRequest
      * Dane płatnika - NIP
      * @var string|null
      */
-    protected ?string $invoice_nip;
+    protected ?string $invoice_nip = null;
     /**
      *    Dane płatnika - ulica i numer domu
      * @var string|null
      */
-    protected ?string $invoice_address;
+    protected ?string $invoice_address = null;
     /**
      * Dane płatnika - kod pocztowy
      * @var string|null
      */
-    protected ?string $invoice_postcode;
+    protected ?string $invoice_postcode = null;
     /**
      * Dane płatnika - miasto
      * @var string|null
      */
-    protected ?string $invoice_city;
+    protected ?string $invoice_city = null;
     /**
      * Opcjonalny kod stanu, regionu, prowincji
      * @var string|null
      */
-    protected ?string $invoice_state_code;
+    protected ?string $invoice_state_code = null;
     /**
      * Dane płatnika - kraj
      * @var string|null
      */
-    protected ?string $invoice_country;
+    protected ?string $invoice_country = null;
     /**
      *    Dane płatnika - 2-literowy kod kraju
      * @var string|null
      */
-    protected ?string $invoice_country_code;
+    protected ?string $invoice_country_code = null;
     /**
      * Adres email kupującego
      * @var string|null
      */
-    protected ?string $email;
+    protected ?string $email = null;
     /**
      * Numer telefonu kupującego
      * @var string|null
      */
-    protected ?string $phone;
+    protected ?string $phone = null;
     /**
      * Nazwa sposobu wysyłki
      * @var string|null
      */
-    protected ?string $delivery_method;
+    protected ?string $delivery_method = null;
     /**
      * Numer ID sposobu wysyłki
      * @var string|null
      */
-    protected ?string $delivery_method_id;
+    protected ?string $delivery_method_id = null;
     /**
      * Cena wysyłki
      * @var float|null
      */
-    protected ?float $delivery_price;
+    protected ?float $delivery_price = null;
     /**
      * Kod paczkomatu, kiosku lub innego punktu odbioru
      * @var string|null
      */
-    protected ?string $delivery_point_name;
+    protected ?string $delivery_point_name = null;
     /**
      * Sześciocyfrowy kod PNI używany w kontekście wysyłki do punktu odbioru Poczty Polskiej
      * @var string|null
      */
-    protected ?string $delivery_point_pni;
+    protected ?string $delivery_point_pni = null;
     /**
      * Adres punktu odbioru
      * @var string|null
      */
-    protected ?string $delivery_point_address;
+    protected ?string $delivery_point_address = null;
     /**
      * Kod pocztowy punktu odbioru
      * @var string|null
      */
-    protected ?string $delivery_point_postcode;
+    protected ?string $delivery_point_postcode = null;
     /**
      * Nazwa miejscowości wybranego punktu odbioru
      * @var string|null
      */
-    protected ?string $delivery_point_city;
+    protected ?string $delivery_point_city = null;
     /**
      * Nazwa sposobu płatności
      * @var string|null
      */
-    protected ?string $payment_method;
+    protected ?string $payment_method = null;
     /**
      * Czy płatność jest za pobraniem (0 - nie, 1 - tak)
      * @var bool|null
      */
-    protected ?bool $payment_method_cod;
+    protected ?bool $payment_method_cod = null;
     /**
      * Komentarz kupującego
      * @var string|null
      */
-    protected ?string $user_comments;
+    protected ?string $user_comments = null;
     /**
      * ID statusu zamówienia (lista statusów do pobrania metodą getOrderStatusList)
      * @var string|null
@@ -198,22 +198,22 @@ class OrderAddRequest
      * Symbol waluty zamówienia
      * @var string|null
      */
-    protected ?string $currency;
+    protected ?string $currency = null;
     /**
      * flaga określająca czy klient chce fakturę (1 - tak, 0 - nie)
      * @var bool|null
      */
-    protected ?bool $want_invoice;
+    protected ?bool $want_invoice = null;
     /**
      * flaga określająca czy zamówienie jest zapłacone (1 - tak, 0 - nie)
      * @var bool|null
      */
-    protected ?bool $paid;
+    protected ?bool $paid = false;
     /**
      * flaga informująca, czy po stworzeniu zamówienia zmniejszony ma zostać stan zakupionych produktów (1 - tak, 0 - nie)
      * @var bool|null
      */
-    protected ?bool $change_products_quantity;
+    protected ?bool $change_products_quantity = null;
     /**
      * $id - identyfikator produktu w podłączonym sklepie
      * $variant_id - identyfikator wariantu produktu (0 jeśli produkt główny)
@@ -226,23 +226,23 @@ class OrderAddRequest
      * Tablica zawierająca produkty zamówienia. Każdy element tablicy to również tablica, zawierająca pola:
      * @var array|null
      */
-    protected ?array $products;
+    protected ?array $products = null;
 
     /**
      * ID transakcji
      * @var string|null
      */
-    protected ?string $transaction_id;
+    protected ?string $transaction_id = null;
     /**
      * ID konta sprzedawcy
      * @var int|null
      */
-    protected ?int $service_account;
+    protected ?int $service_account = null;
     /**
      * Login kupującego
      * @var string|null
      */
-    protected ?string $client_login;
+    protected ?string $client_login = null;
 
     /**
      * @return int|null

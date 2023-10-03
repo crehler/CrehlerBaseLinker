@@ -12,43 +12,43 @@ class OrderAddProduct
      * identyfikator produktu w podłączonym sklepie
      * @var int|null
      */
-    protected ?int $id;
+    protected ?int $id = null;
 
     /**
      * identyfikator wariantu produktu (0 jeśli produkt główny)
      * @var int|null
      */
-    protected ?int $variant_id;
+    protected ?int $variant_id = null;
 
     /**
      * SKU produktu (opcjonalnie)
      * @var string|null
      */
-    protected ?string $sku;
+    protected ?string $sku = null;
 
     /**
      * nazwa produktu (używana jeśli nie można pobrać jej z bazy na podstawie id)
      * @var string|null
      */
-    protected ?string $name;
+    protected ?string $name = null;
 
     /**
      * jednostkowa cena brutto produktu
      * @var float|null
      */
-    protected ?float $price;
+    protected ?float $price = null;
 
     /**
      * akupiona ilość sztuk
      * @var int|null
      */
-    protected ?int $quantity;
+    protected ?int $quantity = null;
 
     /**
      * numer aukcji
      * @var int|null
      */
-    protected ?int $auction_id;
+    protected ?int $auction_id = null;
 
     /**
      * @return int|null

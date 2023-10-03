@@ -9,7 +9,6 @@ use Crehler\BaseLinkerShopsApi\Services\Readers\CategoryReader;
 use Crehler\BaseLinkerShopsApi\Services\Readers\OrderReader;
 use Crehler\BaseLinkerShopsApi\Services\Readers\ProductReader;
 use Monolog\Logger;
-use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Storefront\Controller\StorefrontController;
@@ -17,9 +16,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
-/**
- * @RouteScope(scopes={"storefront"})
- */
+#[Route(defaults: ['_routeScope' => ['storefront']])]
 class BaseLinkerController extends StorefrontController
 {
     public const BASE_LINKER_PASS_KEY = 'bl_pass';
@@ -42,9 +39,7 @@ class BaseLinkerController extends StorefrontController
         $this->orderReader = $orderReader;
     }
 
-    /**
-     * @Route("/baselinker", name="frontend.crehler.baselinker", methods={"GET", "POST"}, defaults={"XmlHttpRequest": true, "csrf_protected"=false})
-     */
+    #[Route(path: '/baselinker', name: 'frontend.crehler.baselinker', options: ['seo' => false], defaults: ['_noStore' => true], methods: ['GET', 'POST'])]
     public function index(Request $request, RequestDataBag $data, SalesChannelContext $salesChannelContext): JsonResponse
     {
         if ($request->getMethod() === Request::METHOD_GET || $request->get(self::BASE_LINKER_PASS_KEY) === null) {
@@ -59,7 +54,7 @@ class BaseLinkerController extends StorefrontController
 
         $action = $request->get(self::ACTION_KEY);
 
-        if (!$this->supportedMethod($action)) {
+        if ($action === null || !$this->supportedMethod($action)) {
             return $this->errorResponse('unsupported_action', 'Unsupported action ' . $action);
         }
 
@@ -89,7 +84,7 @@ class BaseLinkerController extends StorefrontController
             $data->get('filter_quantity_from'),
             $data->get('filter_quantity_to'),
             $data->get('filter_available'),
-            $data->get('page'),
+            (int) $data->get('page'),
             $salesChannelContext
         );
 
@@ -109,7 +104,7 @@ class BaseLinkerController extends StorefrontController
     protected function productsPrices(RequestDataBag $data, SalesChannelContext $salesChannelContext): JsonResponse
     {
         $response = $this->productReader->getProductsPrices(
-            $data->get('page'),
+            (int) $data->get('page'),
             $salesChannelContext
         );
 
@@ -119,7 +114,31 @@ class BaseLinkerController extends StorefrontController
     protected function productsQuantity(RequestDataBag $data, SalesChannelContext $salesChannelContext): JsonResponse
     {
         $response = $this->productReader->getProductsQuantity(
-            $data->get('page'),
+            (int) $data->get('page'),
+            $salesChannelContext
+        );
+
+        return $this->json($response);
+    }
+
+    protected function productsQuantityUpdate(RequestDataBag $data, SalesChannelContext $salesChannelContext): JsonResponse
+    {
+        $products = $data->get('products');
+
+        $response = $this->productReader->productsQuantityUpdate(
+            $this->formatProducts($products),
+            $salesChannelContext
+        );
+
+        return $this->json($response);
+    }
+
+    protected function productsPriceUpdate(RequestDataBag $data, SalesChannelContext $salesChannelContext): JsonResponse
+    {
+        $products = $data->get('products');
+
+        $response = $this->productReader->productsPriceUpdate(
+            $this->formatProducts($products),
             $salesChannelContext
         );
 
@@ -214,6 +233,8 @@ class BaseLinkerController extends StorefrontController
             'ProductsData',
             'ProductsPrices',
             'ProductsQuantity',
+            'ProductsQuantityUpdate',
+            'ProductsPriceUpdate',
             'OrdersGet',
             'OrderUpdate',
             'OrderAdd',
@@ -249,6 +270,15 @@ class BaseLinkerController extends StorefrontController
 
     protected function getLogger(): Logger
     {
-        return $this->get('crehler_base_linker.logger');
+        return $this->container->get('crehler_base_linker.logger');
+    }
+
+    private function formatProducts($products)
+    {
+        if (is_string($products)) {
+            return json_decode($products, true);
+        }
+
+        return $products;
     }
 }

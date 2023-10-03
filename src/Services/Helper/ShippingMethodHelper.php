@@ -9,19 +9,16 @@ use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Checkout\Test\Cart\Common\TrueRule;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Uuid\Uuid;
 
 class ShippingMethodHelper
 {
-    /**
-     * @var EntityRepositoryInterface
-     */
-    private $shippingMethodRepository;
+    private EntityRepository $shippingMethodRepository;
 
-    public function __construct(EntityRepositoryInterface $shippingMethodRepository)
+    public function __construct(EntityRepository $shippingMethodRepository)
     {
         $this->shippingMethodRepository = $shippingMethodRepository;
     }

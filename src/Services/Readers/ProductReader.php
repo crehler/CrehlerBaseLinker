@@ -12,14 +12,13 @@ use Shopware\Core\Content\Product\SalesChannel\SalesChannelProductEntity;
 use Shopware\Core\Content\Property\PropertyGroupCollection;
 use Shopware\Core\Content\Property\PropertyGroupEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\Price;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\ContainsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\NotFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\RangeFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelRepository;
@@ -27,17 +26,21 @@ use Shopware\Core\System\SalesChannel\SalesChannelContext;
 
 class ProductReader
 {
-    private EntityRepositoryInterface $productRepository;
-    private EntityRepositoryInterface $categoryRepository;
+    private const PRICE_REQUEST = 'price';
+    private const QUANTITY_REQUEST = 'quantity';
+
+    private EntityRepository $productRepository;
+    private EntityRepository $categoryRepository;
     private SalesChannelRepository $salesChannelProductRepository;
     private PropertyReader $propertyReader;
 
     public function __construct(
-        EntityRepositoryInterface $productRepository,
-        EntityRepositoryInterface $categoryRepository,
+        EntityRepository       $productRepository,
+        EntityRepository       $categoryRepository,
         SalesChannelRepository $salesChannelProductRepository,
-        PropertyReader $propertyReader
-    ) {
+        PropertyReader                  $propertyReader
+    )
+    {
         $this->productRepository = $productRepository;
         $this->categoryRepository = $categoryRepository;
         $this->salesChannelProductRepository = $salesChannelProductRepository;
@@ -45,22 +48,23 @@ class ProductReader
     }
 
     public function getProductList(
-        string $categoryId,
-        ?string $filterLimit,
-        ?string $filterSort,
-        ?string $filterId,
-        ?string $filterIdsList,
-        ?string $filterEan,
-        ?string $filterSku,
-        ?string $filterName,
-        ?string $filterPriceFrom,
-        ?string $filterPriceTo,
-        ?string $filterQuantityFrom,
-        ?string $filterQuantityTo,
-        ?string $filterAvailable,
-        ?string $page,
+        string              $categoryId,
+        ?string             $filterLimit,
+        ?string             $filterSort,
+        ?string             $filterId,
+        ?string             $filterIdsList,
+        ?string             $filterEan,
+        ?string             $filterSku,
+        ?string             $filterName,
+        ?string             $filterPriceFrom,
+        ?string             $filterPriceTo,
+        ?string             $filterQuantityFrom,
+        ?string             $filterQuantityTo,
+        ?string             $filterAvailable,
+        int                 $page,
         SalesChannelContext $salesChannelContext
-    ): array {
+    ): array
+    {
         $categoryId = $categoryId ?: 'all';
 
         $criteria = new Criteria();
@@ -72,7 +76,7 @@ class ProductReader
 
         $criteria->setLimit($filterLimit ?: 100);
         if ($page && $page > 1) {
-            $criteria->setOffset(($page-1) * $criteria->getLimit());
+            $criteria->setOffset(($page - 1) * $criteria->getLimit());
         }
 
         if ($filterAvailable) {
@@ -131,11 +135,7 @@ class ProductReader
         $productList = $this->salesChannelProductRepository->search($criteria, $salesChannelContext);
 
         if (!$filterLimit) {
-            $totalCriteria = clone $criteria;
-            $totalCriteria->setLimit(null);
-            $totalCriteria->setOffset(null);
-            $total = $this->salesChannelProductRepository->searchIds($totalCriteria, $salesChannelContext)->getTotal();
-            $pages = (int) ceil($total / $criteria->getLimit());
+            $pages = $this->getPages($criteria, $salesChannelContext);
         } else {
             $pages = 0;
         }
@@ -197,7 +197,7 @@ class ProductReader
                 $sumAvailableStock = 0;
 
                 foreach ($variantsIds as $variantsId) {
-                    $variant = $this->readStorefrontProduct($variantsId,null, $salesChannelContext);
+                    $variant = $this->readStorefrontProduct($variantsId, null, $salesChannelContext);
 
                     if (!$variant instanceof SalesChannelProductEntity) {
                         continue;
@@ -233,14 +233,14 @@ class ProductReader
         return $productsData;
     }
 
-    public function getProductsPrices(?string $page, SalesChannelContext $salesChannelContext): array
+    public function getProductsPrices(int $page, SalesChannelContext $salesChannelContext): array
     {
-        return $this->getProductsInformation($page, 'price', $salesChannelContext);
+        return $this->getProductsInformation($page, self::PRICE_REQUEST, $salesChannelContext);
     }
 
-    public function getProductsQuantity(?string $page, SalesChannelContext $salesChannelContext): array
+    public function getProductsQuantity(int $page, SalesChannelContext $salesChannelContext): array
     {
-        return $this->getProductsInformation($page, 'quantity', $salesChannelContext);
+        return $this->getProductsInformation($page, self::QUANTITY_REQUEST, $salesChannelContext);
     }
 
     public function getProduct(string $productId, Context $context): ProductEntity
@@ -275,16 +275,16 @@ class ProductReader
             ];
         }
 
-        if ($pages) {
+        if ($pages && $pages > 1) {
             $data['pages'] = $pages;
         }
 
         return $data;
     }
 
-    public function getProductsInformation(?string $page, string $type, SalesChannelContext $salesChannelContext): array
+    public function getProductsInformation(int $page, string $type, SalesChannelContext $salesChannelContext): array
     {
-        $productsPrices = [];
+        $response = [];
         $parentIds = [];
 
         $criteria = new Criteria();
@@ -292,50 +292,58 @@ class ProductReader
         $criteria->addFilter(
             new EqualsFilter('product.visibilities.salesChannelId', $salesChannelContext->getSalesChannelId())
         );
+
+        $criteria->setLimit(100);
+        if ($page > 1) {
+            $criteria->setOffset(($page - 1) * $criteria->getLimit());
+        }
+
         $mainProducts = $this->salesChannelProductRepository->search($criteria, $salesChannelContext)->getEntities();
+
         /** @var SalesChannelProductEntity $mainProduct */
         foreach ($mainProducts as $mainProduct) {
             $data = '';
-            if ($type === 'price') {
+            if ($type === self::PRICE_REQUEST) {
                 $data = $mainProduct->getCalculatedPrice()->getUnitPrice();
-            } elseif ($type === 'quantity') {
+            } elseif ($type === self::QUANTITY_REQUEST) {
                 $data = $mainProduct->getAvailableStock();
             }
-            $productsPrices[$mainProduct->getAutoIncrement()][0] = $data;
+            $response[$mainProduct->getAutoIncrement()][0] = $data;
             $parentIds[$mainProduct->getId()] = $mainProduct->getAutoIncrement();
         }
 
         $variantCriteria = new Criteria();
-        $variantCriteria->addFilter(
-            new NotFilter(MultiFilter::CONNECTION_AND, [
-                new EqualsFilter('product.parentId', null)
-            ]
-        ));
+        $variantCriteria->addFilter(new EqualsAnyFilter('product.parentId', $mainProducts->getIds()));
         $variantCriteria->addFilter(
             new EqualsFilter('product.visibilities.salesChannelId', $salesChannelContext->getSalesChannelId())
         );
+
         $variantProducts = $this->salesChannelProductRepository->search($variantCriteria, $salesChannelContext)->getEntities();
+
         /** @var SalesChannelProductEntity $variantProduct */
         foreach ($variantProducts as $variantProduct) {
             $parentAutoIncrementId = $parentIds[$variantProduct->getParentId()] ?? null;
             if (null === $parentAutoIncrementId) continue;
             $variantData = '';
-            if ($type === 'price') {
+            if ($type === self::PRICE_REQUEST) {
                 $variantData = $variantProduct->getCalculatedPrice()->getUnitPrice();
-            } elseif ($type === 'quantity') {
+            } elseif ($type === self::QUANTITY_REQUEST) {
                 $variantData = $variantProduct->getAvailableStock();
             }
-            $productsPrices[$parentAutoIncrementId][$variantProduct->getAutoIncrement()] = $variantData;
+            $response[$parentAutoIncrementId][$variantProduct->getAutoIncrement()] = $variantData;
         }
 
-        return $productsPrices;
+        $response['pages'] = $this->getPages($criteria, $salesChannelContext);
+
+        return $response;
     }
 
     public function readStorefrontProduct(
-        ?string $productId,
-        ?string $productAutoIncrementId,
+        ?string             $productId,
+        ?string             $productAutoIncrementId,
         SalesChannelContext $salesChannelContext
-    ): ?SalesChannelProductEntity {
+    ): ?SalesChannelProductEntity
+    {
         if ($productId) {
             $criteria = new Criteria([$productId]);
         } elseif ($productAutoIncrementId) {
@@ -354,6 +362,57 @@ class ProductReader
         return $this->salesChannelProductRepository->search($criteria, $salesChannelContext)->first();
     }
 
+    public function productsQuantityUpdate(?array $products, SalesChannelContext $salesChannelContext): array
+    {
+        $counter = 0;
+        $context = $salesChannelContext->getContext();
+
+        foreach ($products as $product) {
+            try {
+                $success = $this->updateProductStock(
+                    (int)$product['product_id'],
+                    $product['variant_id'] ?: null,
+                    $product['operation'],
+                    (int)$product['quantity'],
+                    $context
+                );
+            } catch (\Throwable $e) {
+//                $this->logger->error('Update product stock error: ' . $e->getMessage());
+                continue;
+            }
+
+            if ($success) {
+                $counter++;
+            }
+        }
+
+        return ['counter' => $counter];
+    }
+
+    public function productsPriceUpdate(?array $products, SalesChannelContext $salesChannelContext): array
+    {
+        $counter = 0;
+
+        foreach ($products as $product) {
+            try {
+                $success = $this->updateProductPrice(
+                    (int)$product['product_id'],
+                    $product['variant_id'] ?: null,
+                    (float)$product['price'],
+                    $salesChannelContext
+                );
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if ($success) {
+                $counter++;
+            }
+        }
+
+        return ['counter' => $counter];
+    }
+
     private function prepareFeatures(?PropertyGroupCollection $propertyGroupCollection): array
     {
         $features = [];
@@ -368,7 +427,7 @@ class ProductReader
                 $options[] = $option->getTranslation('name');
             }
 
-            $feature[1] = implode('|',$options);
+            $feature[1] = implode('|', $options);
 
             if (!empty($feature)) {
                 $features[] = $feature;
@@ -384,6 +443,10 @@ class ProductReader
         if ($cover instanceof ProductMediaEntity && $cover->getMedia() !== null) {
             $images[] = $cover->getMedia()->getUrl();
         }
+
+        $productMediaCollection->sort(
+            fn(ProductMediaEntity $a, ProductMediaEntity $b) => $a->getPosition() <=> $b->getPosition()
+        );
 
         foreach ($productMediaCollection as $mediaEntity) {
             if ($mediaEntity->getMedia() !== null) {
@@ -409,7 +472,7 @@ class ProductReader
         }
 
         $criteria->addFilter(
-            new RangeFilter($field , $params)
+            new RangeFilter($field, $params)
         );
 
         return $criteria;
@@ -429,7 +492,7 @@ class ProductReader
         if (strpos($fieldSort, 'id') !== false) {
             return 'product.autoIncrement';
         } elseif (strpos($fieldSort, 'quantity') !== false) {
-            return 'product.quantity';
+            return 'availableStock';
         } elseif (strpos($fieldSort, 'price') !== false) {
             return 'product.price';
         }
@@ -456,6 +519,135 @@ class ProductReader
             ->search($criteria, $context)
             ->getIds();
     }
+
+    private function getPages(Criteria $criteria, SalesChannelContext $salesChannelContext): int
+    {
+        $totalCriteria = clone $criteria;
+        $totalCriteria->setLimit(null);
+        $totalCriteria->setOffset(null);
+        $total = $this->salesChannelProductRepository->searchIds($totalCriteria, $salesChannelContext)->getTotal();
+        return (int)ceil($total / $criteria->getLimit());
+    }
+
+    /**
+     * @param int $productIncrement
+     * @param int|null $variantIncrement
+     * @param string $operation (set|change)
+     * @param int $quantity
+     * @param Context $context
+     * @return bool
+     */
+    private function updateProductStock(
+        int     $productIncrement,
+        ?int    $variantIncrement,
+        string  $operation,
+        int     $quantity,
+        Context $context
+    ): bool
+    {
+        $shopwareProduct = $this->shopwareProduct($productIncrement, $variantIncrement, $context);
+        if (!$shopwareProduct instanceof ProductEntity) return false;
+
+        if ($operation === 'change') {
+            $quantity -= $shopwareProduct->getStock();
+        }
+
+        if ($quantity < 0 || $quantity === $shopwareProduct->getStock()) {
+            return true;
+        }
+
+        $this->productRepository->upsert([
+            [
+                'id' => $shopwareProduct->getId(),
+                'stock' => $quantity
+            ]
+        ], $context);
+
+        return true;
+    }
+
+    private function updateProductPrice(
+        int     $productIncrement,
+        ?int    $variantIncrement,
+        float   $price,
+        SalesChannelContext $salesChannelContext
+    ): bool
+    {
+        $shopwareProduct = $this->shopwareProduct(
+            $productIncrement,
+            $variantIncrement,
+            $salesChannelContext->getContext()
+        );
+
+        if (!$shopwareProduct instanceof ProductEntity) return false;
+        $shopwareProductPrices = $shopwareProduct->getPrice();
+
+        $priceUpdate = [];
+        $shopwarePrice = null;
+        foreach ($shopwareProductPrices as $productPrice) {
+            if ($productPrice->getCurrencyId() === $salesChannelContext->getCurrencyId()) {
+                $shopwarePrice = $productPrice;
+            } else {
+                $priceUpdate[] = $this->preparePrice($productPrice);
+            }
+        }
+
+        if ($shopwarePrice === null) {
+            return false;
+        }
+
+        if ($price === $shopwarePrice->getGross()) {
+            return true;
+        }
+
+        $priceData = [
+            'currencyId' => $shopwarePrice->getCurrencyId(),
+            'gross' => $price,
+            'net' => $price / (1 + $shopwareProduct->getTax()->getTaxRate() / 100.0),
+            'linked' => true,
+            'percentage' => $shopwarePrice->getPercentage(),
+        ];
+
+        if (!empty($shopwarePrice->jsonSerialize()['listPrice'])) {
+            $priceData['listPrice'] = $shopwarePrice->getListPrice()->jsonSerialize();
+        }
+
+        if (!empty($shopwarePrice->jsonSerialize()['regulationPrice'])) {
+            $priceData['regulationPrice'] = $shopwarePrice->getRegulationPrice()->jsonSerialize();
+        }
+
+        $priceUpdate[] = $priceData;
+
+        $this->productRepository->upsert([
+            [
+                'id' => $shopwareProduct->getId(),
+                'price' => $priceUpdate
+            ]
+        ], $salesChannelContext->getContext());
+
+        return true;
+    }
+
+    private function shopwareProduct(int $productIncrement, ?int $variantIncrement, Context $context): ?ProductEntity
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('autoIncrement', $variantIncrement ?? $productIncrement));
+
+        return $this->productRepository->search($criteria, $context)->first();
+    }
+
+    private function preparePrice(Price $productPrice): array
+    {
+        $price = $productPrice->jsonSerialize();
+
+        if ($price['listPrice'] instanceof Price) {
+            $price['listPrice'] = $price['listPrice']->jsonSerialize();
+        }
+
+        if (isset($price['regulationPrice']) && $price['regulationPrice'] instanceof Price) {
+            $price['regulationPrice'] = $price['regulationPrice']->jsonSerialize();
+        }
+
+        return $price;
+    }
 }
-
-

@@ -7,15 +7,20 @@ use Crehler\BaseLinkerShopsApi\Services\Creators\OrderCreator;
 use Crehler\BaseLinkerShopsApi\Struct\ConfigStruct;
 use Monolog\Logger;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
+use Shopware\Core\Checkout\Cart\Price\Struct\CalculatedPrice;
 use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTax;
+use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTaxCollection;
+use Shopware\Core\Checkout\Cart\Tax\Struct\TaxRuleCollection;
+use Shopware\Core\Checkout\Order\Aggregate\OrderAddress\OrderAddressEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryEntity;
+use Shopware\Core\Checkout\Order\Aggregate\OrderLineItem\OrderLineItemEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStates;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Order\OrderStates;
 use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -30,19 +35,19 @@ class OrderReader
     private const UPDATE_PAID = 'paid';
     private const UPDATE_DELIVERY_NUMBER = 'delivery_number';
 
-    private EntityRepositoryInterface $orderRepository;
-    private EntityRepositoryInterface $shippingMethodRepository;
-    private EntityRepositoryInterface $paymentMethodRepository;
-    private EntityRepositoryInterface $stateMachineStateRepository;
+    private EntityRepository $orderRepository;
+    private EntityRepository $shippingMethodRepository;
+    private EntityRepository $paymentMethodRepository;
+    private EntityRepository $stateMachineStateRepository;
     private ProductReader $productReader;
     private OrderCreator $orderService;
     private Logger $logger;
 
     public function __construct(
-        EntityRepositoryInterface $orderRepository,
-        EntityRepositoryInterface $shippingMethodRepository,
-        EntityRepositoryInterface $paymentMethodRepository,
-        EntityRepositoryInterface $stateMachineStateRepository,
+        EntityRepository $orderRepository,
+        EntityRepository $shippingMethodRepository,
+        EntityRepository $paymentMethodRepository,
+        EntityRepository $stateMachineStateRepository,
         ProductReader $productReader,
         OrderCreator $orderService,
         Logger $logger
@@ -57,15 +62,16 @@ class OrderReader
     }
 
     public function ordersGet(
-        ?string $timeFrom,
-        ?string $idFrom,
-        ?string $onlyPaid,
-        ConfigStruct $configStruct,
+        ?string             $timeFrom,
+        ?string             $idFrom,
+        ?string             $onlyPaid,
+        ConfigStruct        $configStruct,
         SalesChannelContext $salesChannelContext
-    ): array {
+    ): array
+    {
         $ordersResponse = [];
 
-        if (!$timeFrom && !$idFrom) return $ordersResponse;
+        if ($timeFrom === null && $idFrom === null) return $ordersResponse;
 
         $criteria = new Criteria();
         $criteria->getAssociation('lineItems')->addAssociation('product');
@@ -75,6 +81,7 @@ class OrderReader
         $criteria->getAssociation('billingAddress')->addAssociation('country');
         $criteria->getAssociation('addresses')->addAssociation('country');
         $criteria->getAssociation('deliveries')
+            ->addAssociation('positions')
             ->addAssociation('shippingMethod')
             ->addAssociation('country');
 
@@ -85,12 +92,12 @@ class OrderReader
             )
         );
 
-        if ($timeFrom) {
+        if ($timeFrom !== null) {
             $orderDate = (new \DateTime())->setTimestamp($timeFrom)->format('Y-m-d H:i:s');
             $criteria->addFilter(new RangeFilter('createdAt', ['gte' => $orderDate]));
         }
 
-        if ($idFrom) {
+        if ($idFrom !== null) {
             $criteria->addFilter(new RangeFilter('orderNumber', ['gte' => $idFrom]));
         }
 
@@ -103,24 +110,22 @@ class OrderReader
             );
         }
 
+        if ($configStruct->getOrderStartDate() !== null) {
+            $orderDate = $configStruct->getOrderStartDate()->format('Y-m-d H:i:s');
+            $criteria->addFilter(new RangeFilter('orderDateTime', ['gte' => $orderDate]));
+        }
+
         $orders = $this->orderRepository
             ->search($criteria, $salesChannelContext->getContext())->getEntities();
 
         /** @var OrderEntity $order */
         foreach ($orders as $order) {
-            if ($order->getDeliveries()->first() instanceof OrderDeliveryEntity) {
-                $delivery = $order->getDeliveries()->first();
-                $deliveryAddressId = $delivery->getShippingOrderAddressId();
-                $deliveryAddress = $order->getAddresses()->get($deliveryAddressId);
-            } else {
-                $delivery = null;
-                $deliveryAddress = $order->getBillingAddress();
-            }
+            [$delivery, $deliveryAddress] = $this->prepareDelivery($order);
 
             $transaction = null;
             $isPaymentCod = 0;
-            if ($order->getTransactions()->first() instanceof OrderTransactionEntity) {
-                $transaction = $order->getTransactions()->first();
+            if ($order->getTransactions()->last() instanceof OrderTransactionEntity) {
+                $transaction = $order->getTransactions()->last();
 
                 if (in_array($transaction->getPaymentMethodId(), $configStruct->getCodPaymentMethodIds())) {
                     $isPaymentCod = 1;
@@ -128,11 +133,15 @@ class OrderReader
             }
 
             $products = [];
+            $promoComment = '';
             $order->getLineItems()->sortByPosition();
 
             foreach ($order->getLineItems() as $lineItem) {
                 try {
-                    if ($lineItem->getProduct() instanceof ProductEntity) {
+                    if (
+                        $lineItem->getParentId() === null
+                        && $lineItem->getProduct() instanceof ProductEntity
+                    ) {
                         $product = $lineItem->getProduct();
 
                         if ($product->getParentId() === null) {
@@ -146,18 +155,28 @@ class OrderReader
                             $variantId = $product->getAutoIncrement();
                         }
 
+                        $price = $lineItem->getUnitPrice();
+                        $tax = $lineItem->getPrice()->getCalculatedTaxes()->first()->getTaxRate();
+
                         $products[] = [
                             'id' => $productId,
                             'variant_id' => $variantId,
                             'name' => $lineItem->getLabel(),
                             'quantity' => $lineItem->getQuantity(),
-                            'price' => $lineItem->getUnitPrice(),
+                            'price' => $price,
                             'weight' => $product->getWeight(),
-                            'tax' => $lineItem->getPrice()->getCalculatedTaxes()->first()->getTaxRate(),
+                            'tax' => $tax,
                             'ean' => $product->getEan(),
                             'sku' => $product->getProductNumber(),
+                            'attributes' => $this->prepareAttributes($lineItem)
                         ];
                     } elseif ($lineItem->getType() === LineItem::PROMOTION_LINE_ITEM_TYPE) {
+                        //exclude bundle discount
+                        $payload = $lineItem->getPayload();
+                        if (isset($payload['code']) && $payload['code'] === 'bundle-discount') {
+                            continue;
+                        }
+
                         $tax = $lineItem->getPrice()->getCalculatedTaxes()->first();
                         $products[] = [
                             'name' => $lineItem->getLabel(),
@@ -176,15 +195,11 @@ class OrderReader
                 continue;
             }
 
-            $deliveryPoint = ['name' => '', 'address' => '', 'postCode' => '', 'city' => ''];
-            if (isset($deliveryAddress->getCustomFields()['inpostId'])) {
-                $deliveryPoint = [
-                    'name' => $deliveryAddress->getCustomFields()['inpostId'],
-                    'address' => $deliveryAddress->getStreet(),
-                    'postCode' => $deliveryAddress->getZipcode(),
-                    'city' => $deliveryAddress->getCity(),
-                ];
-            }
+            $deliveryPoint = $this->buildDeliveryPoint($order, $deliveryAddress);
+            $deliveryAddress = $this->buildDeliveryAddress($deliveryAddress, $order->getBillingAddress(), $deliveryPoint);
+
+            $invoiceNip = $order->getOrderCustomer()->getVatIds() ?
+                implode('', $order->getOrderCustomer()->getVatIds()) : '';
 
             $ordersResponse[$order->getOrderNumber()] = [
                 'delivery_fullname' => $deliveryAddress->getFirstName() . ' ' . $deliveryAddress->getLastName(),
@@ -212,27 +227,26 @@ class OrderReader
                 'invoice_postcode' => $order->getBillingAddress()->getZipcode(),
                 'invoice_country' => $order->getBillingAddress()->getCountry()->getTranslation('name'),
                 'invoice_country_code' => $order->getBillingAddress()->getCountry()->getIso(),
-                'invoice_nip' => $order->getOrderCustomer()->getVatIds() ?
-                    implode('', $order->getOrderCustomer()->getVatIds()) : '',
+                'invoice_nip' => $invoiceNip,
                 'delivery_point_name' => $deliveryPoint['name'],
                 'delivery_point_address' => $deliveryPoint['address'],
                 'delivery_point_postcode' => $deliveryPoint['postCode'],
                 'delivery_point_city' => $deliveryPoint['city'],
-                'phone' => $deliveryAddress->getPhoneNumber() ?? $order->getBillingAddress()->getPhoneNumber(),
+                'phone' => $this->preparePhone($deliveryAddress, $order->getBillingAddress()),
                 'email' => $order->getOrderCustomer()->getEmail(),
                 'date_add' => $order->getCreatedAt()->getTimestamp(),
                 'payment_method' => $transaction ? $transaction->getPaymentMethod()->getTranslation('name') : '',
                 'payment_method_cod' => $isPaymentCod,
                 'currency' => $order->getCurrency()->getIsoCode(),
-                'user_comments' => $order->getCustomerComment(),
+                'user_comments' => $promoComment . $order->getCustomerComment(),
                 'user_comments_long' => '',
                 'admin_comments' => '',
                 'status_id' => $order->getStateId(),
-                'delivery_method_id' => $delivery ? $delivery->getId() : '',
+                'delivery_method_id' => $delivery ? $delivery->getShippingMethod()->getId() : '',
                 'delivery_method' => $delivery ? $delivery->getShippingMethod()->getTranslation('name') : '',
                 'delivery_price' => $delivery ? $delivery->getShippingCosts()->getTotalPrice() : 0.0,
                 'paid' => $transaction->getStateMachineState()->getTechnicalName() === OrderTransactionStates::STATE_PAID,
-                'want_invoice' => 0,
+                'want_invoice' => (int)($order->getBillingAddress()->getCompany() && $invoiceNip),
                 'extra_field_1' => '',
                 'extra_field_2' => '',
                 'products' => $products,
@@ -243,11 +257,12 @@ class OrderReader
     }
 
     public function orderUpdate(
-        string $orderNumbers,
-        string $updateType,
-        string $updateValue,
+        string              $orderNumbers,
+        string              $updateType,
+        string              $updateValue,
         SalesChannelContext $salesChannelContext
-    ): array {
+    ): array
+    {
         $counter = 0;
         $context = $salesChannelContext->getContext();
 
@@ -272,7 +287,7 @@ class OrderReader
                     $this->updateOrderStatus($order, $updateValue, $context);
                     break;
                 case self::UPDATE_PAID:
-                    $this->updateOrderPaid($order, (bool) $updateValue, $context);
+                    $this->updateOrderPaid($order, (bool)$updateValue, $context);
                     break;
                 case self::UPDATE_DELIVERY_NUMBER:
                     $this->updateOrderDeliveryNumber($order, $updateValue, $context);
@@ -429,5 +444,189 @@ class OrderReader
         $this->logger->error('Create was created ' . $orderNumber);
 
         return ['order_id' => $orderNumber];
+    }
+
+    private function buildDeliveryPoint(OrderEntity $order, OrderAddressEntity $deliveryAddress): array
+    {
+        $deliveryPoint = ['name' => '', 'address' => '', 'postCode' => '', 'city' => ''];
+
+        if (isset($deliveryAddress->getCustomFields()['inpostPointId'])) {
+            $deliveryPoint = [
+                'name' => $deliveryAddress->getCustomFields()['inpostPointId'],
+                ...$this->preparePointAddress($deliveryAddress)
+            ];
+        }
+
+        if (isset($deliveryAddress->getCustomFields()['polishPostPointId'])) {
+            $deliveryPoint = [
+                'name' => $deliveryAddress->getCustomFields()['polishPostPointId'],
+                ...$this->preparePointAddress($deliveryAddress)
+            ];
+        }
+
+        if (isset($deliveryAddress->getCustomFields()['orlenPaczkaPointId'])) {
+            $deliveryPoint = [
+                'name' => $deliveryAddress->getCustomFields()['orlenPaczkaPointId'],
+                ...$this->preparePointAddress($deliveryAddress)
+            ];
+        }
+
+        if (isset($deliveryAddress->getCustomFields()['crehler_place_to_place_point_id'])) {
+            $deliveryPoint = [
+                'name' => $deliveryAddress->getCustomFields()['crehler_place_to_place_point_id'],
+                ...$this->preparePointAddress($deliveryAddress)
+            ];
+        }
+
+        //storeLocator
+        if (isset($order->getCustomFields()['store_pickup'])) {
+            if ($order->getDeliveries()->last() instanceof OrderDeliveryEntity) {
+                $storeDelivery = $order->getDeliveries()->last();
+                $storeDeliveryAddressId = $storeDelivery->getShippingOrderAddressId();
+                $storeDeliveryAddress = $order->getAddresses()->get($storeDeliveryAddressId);
+
+                $deliveryPoint = [
+                    'name' => $order->getCustomFields()['store_pickup_location_name'],
+                    ...$this->preparePointAddress($storeDeliveryAddress)
+                ];
+            }
+        }
+
+        return $deliveryPoint;
+    }
+
+    private function preparePointAddress(OrderAddressEntity $deliveryAddress): array
+    {
+        return [
+            'address' => $deliveryAddress->getStreet(),
+            'postCode' => $deliveryAddress->getZipcode(),
+            'city' => $deliveryAddress->getCity(),
+        ];
+    }
+
+    private function preparePhone(?OrderAddressEntity $deliveryAddress, OrderAddressEntity $billingAddress): ?string
+    {
+        if (
+            $deliveryAddress !== null
+            && $deliveryAddress->getPhoneNumber() !== '-'
+            && $deliveryAddress->getPhoneNumber() !== 'not_exists'
+        ) {
+            return $deliveryAddress->getPhoneNumber();
+        }
+
+        return $billingAddress->getPhoneNumber();
+    }
+
+    private function prepareDelivery(OrderEntity $order): array
+    {
+        if ($order->getDeliveries() === null || $order->getDeliveries()->count() === 0) {
+            return [null, $order->getBillingAddress()];
+        }
+
+        $delivery = null;
+        $promotionDelivery = null;
+
+        foreach ($order->getDeliveries() as $orderDelivery) {
+            if ($orderDelivery->getShippingCosts()->getUnitPrice() >= 0) {
+                $delivery = $orderDelivery;
+            } else {
+                $promotionDelivery = $orderDelivery;
+            }
+        }
+
+        if ($promotionDelivery !== null) {
+            $delivery = $this->calculateDeliveryShippingCost($delivery, $promotionDelivery);
+        }
+
+        if ($order->getAddresses() === null) {
+            return [$delivery, $order->getBillingAddress()];
+        }
+
+        $deliveryAddress = $order->getAddresses()->get($delivery->getShippingOrderAddressId());
+
+        if (
+            isset($order->getCustomFields()['store_pickup'], $deliveryAddress->getCustomFields()['isStoreLocator'])
+            && $deliveryAddress->getCustomFields()['isStoreLocator'] === true
+        ) {
+            $deliveryAddress = $order->getBillingAddress();
+        }
+
+        return [$delivery, $deliveryAddress];
+    }
+
+    private function prepareAttributes(OrderLineItemEntity $lineItem): array
+    {
+        $attributes = [];
+
+        if (
+            !empty($lineItem->getPayload()['options'])
+            && is_array($lineItem->getPayload()['options'])
+        ) {
+            foreach ($lineItem->getPayload()['options'] as $option) {
+                $attributes[] = [
+                    'name' => $option['group'],
+                    'value' => $option['option'],
+                    'price' => 0,
+                ];
+            }
+        }
+
+        return $attributes;
+    }
+
+    private function buildDeliveryAddress(
+        OrderAddressEntity $deliveryAddress,
+        OrderAddressEntity $billingAddress,
+        array              $deliveryPoint
+    ): OrderAddressEntity
+    {
+        if (isset($deliveryAddress->getCustomFields()['crehler_place_to_place_point_id'])) {
+            $deliveryAddress->setCity($billingAddress->getCity());
+            $deliveryAddress->setZipcode($billingAddress->getZipcode());
+            $deliveryAddress->setStreet($billingAddress->getStreet());
+            $deliveryAddress->setAdditionalAddressLine1($billingAddress->getAdditionalAddressLine1());
+            $deliveryAddress->setAdditionalAddressLine2($billingAddress->getAdditionalAddressLine2());
+        }
+
+        return $deliveryAddress;
+    }
+
+    private function calculateDeliveryShippingCost(
+        OrderDeliveryEntity $delivery,
+        OrderDeliveryEntity $promotionDelivery
+    ): OrderDeliveryEntity
+    {
+        if ($promotionDelivery->getShippingMethod()->getId() === $delivery->getShippingMethod()->getId()) {
+            $shippingCost = $delivery->getShippingCosts();
+            $promoCost = $promotionDelivery->getShippingCosts();
+
+            $calculatedTaxes = new CalculatedTaxCollection();
+            $taxRules = new TaxRuleCollection();
+
+            foreach ($shippingCost->getCalculatedTaxes() as $calculatedTax) {
+                $promoCalculatedTaxPart = $promoCost->getCalculatedTaxes()->get($calculatedTax->getTaxRate());
+                if ($promoCalculatedTaxPart === null) {
+                    continue;
+                }
+
+                $calculatedTax->setPrice($calculatedTax->getPrice() + $promoCalculatedTaxPart->getPrice());
+                $calculatedTax->setTax($calculatedTax->getTax() + $promoCalculatedTaxPart->getTax());
+
+                $calculatedTaxes->add($calculatedTax);
+                $taxRules->add($shippingCost->getTaxRules()->get($calculatedTax->getTaxRate()));
+            }
+
+            $newShippingCost = new CalculatedPrice(
+                $shippingCost->getUnitPrice() + $promoCost->getUnitPrice(),
+                $shippingCost->getTotalPrice() + $promoCost->getTotalPrice(),
+                $calculatedTaxes,
+                $taxRules,
+                $shippingCost->getQuantity()
+            );
+
+            $delivery->setShippingCosts($newShippingCost);
+        }
+
+        return $delivery;
     }
 }

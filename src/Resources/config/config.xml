@@ -15,6 +15,16 @@
             <label lang="pl-PL">Sposoby płatność z płatnością przy odbiorze</label>
         </component>
 
+        <input-field type="datetime">
+            <name>orderStartDate</name>
+            <label>Order start date</label>
+            <label lang="pl-PL">Data startowa zamówień</label>
+            <label lang="de-DE">Startdatum der Bestellung</label>
+            <helpText>Date from which orders will be collected.</helpText>
+            <helpText lang="de-DE">Datum, ab dem Bestellungen abgeholt werden.</helpText>
+            <helpText lang="pl-PL">Data, od której będą pobierane zamówienia.</helpText>
+        </input-field>
+
         <input-field type="password">
             <name>shopsApiPassword</name>
             <label>Shops API password</label>

@@ -3,6 +3,7 @@
 namespace Crehler\BaseLinkerShopsApi\Services;
 
 use Crehler\BaseLinkerShopsApi\Struct\ConfigStruct;
+use DateTime;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 
 /**
@@ -26,7 +27,22 @@ class ConfigService
         $config = ($this->systemConfigService->get($this->pluginName, $salesChannelId))['config'];
 
         return (new ConfigStruct())
-            ->setCodPaymentMethodIds($config['codPaymentMethodIds'])
-            ->setShopsApiPassword($config['shopsApiPassword']);
+            ->setCodPaymentMethodIds($config['codPaymentMethodIds'] ?? [])
+            ->setShopsApiPassword($config['shopsApiPassword'] ?? null)
+            ->setOrderStartDate($this->prepareOrderStartDate($config['orderStartDate'] ?? null));
+    }
+
+    private function prepareOrderStartDate(?string $dateTime): ?DateTime
+    {
+        $orderStartDate = null;
+        if ($dateTime) {
+            try {
+                $orderStartDate = new \DateTime($dateTime);
+            } catch (\Throwable $e) {
+                //nth
+            }
+        }
+
+        return $orderStartDate;
     }
 }
